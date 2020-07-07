@@ -11,6 +11,7 @@ from nltk.stem import WordNetLemmatizer
 from sqlalchemy import create_engine
 
 import pickle
+from sklearn.base import BaseEstimator,TransformerMixin
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -67,18 +68,64 @@ def tokenize(text):
     return clean_tokens
 
 
+class StartingVerbExtractor(BaseEstimator, TransformerMixin):
+    """
+    Starting Verb Extractor class
+    
+    This class extract the starting verb of a sentence,
+    creating a new feature for the ML classifier
+    """
+
+    def starting_verb(self, text):
+        sentence_list = nltk.sent_tokenize(text)
+        for sentence in sentence_list:
+            pos_tags = nltk.pos_tag(tokenize(sentence))
+            first_word, first_tag = pos_tags[0]
+            if first_tag in ['VB', 'VBP'] or first_word == 'RT':
+                return True
+        return False
+
+    # Given it is a tranformer we can return the self 
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X_tagged = pd.Series(X).apply(self.starting_verb)
+        return pd.DataFrame(X_tagged)
+
+
+
+
+
 def build_model():
+    '''
+    This functionn prepares the model but building a pipline
+    It will return the model that we will use directy to fit and train our data
+    '''
     classifier = RandomForestClassifier(min_samples_split = 100,min_samples_leaf = 20, max_depth = 8,
                                        max_features = 'sqrt', random_state = 1)
+    
     pipeline = Pipeline([
-            ('vect', CountVectorizer(tokenizer=tokenize)),
-            ('tfidf', TfidfTransformer()),
-            ('clf', MultiOutputClassifier(classifier)),
+        ('features', FeatureUnion([
+
+            ('text_pipeline', Pipeline([
+                ('count_vectorizer', CountVectorizer(tokenizer=tokenize)),
+                ('tfidf_transformer', TfidfTransformer())
+            ])),
+
+            ('starting_verb_transformer', StartingVerbExtractor())
+        ])),
+
+        ('classifier', MultiOutputClassifier(classifier))
     ])
     
     params = {
     
-            'clf__estimator__n_estimators': [100, 200],
+            'classifier__estimator__n_estimators': [100, 200]
+#         ,
+        #             'classifier__estimator__random_state' : [1,5,10],
+#             'classifier__estimator__min_samples_split':[100,200,300]
+        
                                                         }
     cv = GridSearchCV(pipeline, param_grid=params, cv=5, n_jobs=-1)
     
@@ -103,6 +150,11 @@ def evaluate_model(model, X_test, Y_test, category_names):
 
 
 def save_model(model, model_filepath):
+    '''
+    model : model build by the build model function
+    model_filepath : Where the model will be saved
+   
+    '''
     pickle.dump(model, open(model_filepath, 'wb'))
     
 

@@ -42,10 +42,10 @@ def clean_data(df):
 
     for column in categories:
         # set each value to be the last character of the string
-        categories[column] = categories[column].str.split('-',expand =True)[1]
-
+        categories[column] = categories[column].str[-1]
         # convert column from string to numeric
-        categories[column] = pd.to_numeric(categories[column])
+        categories[column] = categories[column].astype(np.int)
+
     
     # drop columns that are no longer needed
     df = df.drop('categories',axis = 1)
@@ -53,8 +53,8 @@ def clean_data(df):
     
     # concatenate the original dataframe with the new `categories` dataframe
     categories['id']= df['id']
-    df = pd.merge(df,categories)
-    
+    df = pd.concat([df,categories],axis=1)
+
     # Check if there are duplicates and remove them
     # check number of duplicates
     if(sum(df.duplicated(subset=None, keep='first') != 0)):
