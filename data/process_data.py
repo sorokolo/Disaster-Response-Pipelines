@@ -60,6 +60,8 @@ def clean_data(df):
     if(sum(df.duplicated(subset=None, keep='first') != 0)):
         df.drop_duplicates(subset = None,keep = False, inplace = True)
         
+    df = df.drop(['child_alone'],axis=1)
+    df['related']=df['related'].map(lambda x: 1 if x == 2 else x)
         
     return df
 
